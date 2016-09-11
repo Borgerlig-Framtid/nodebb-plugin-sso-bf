@@ -14,18 +14,18 @@
 	var authenticationController = module.parent.require('./controllers/authentication');
 
 	var constants = Object.freeze({
-		'name': 'Facebook',
+		'name': 'BF SSO',
 		'admin': {
 			'route': '/plugins/sso-bf',
 			'icon': 'fa-facebook-square'
 		}
 	});
 
-	var Facebook = {
+	var BF = {
 		settings: undefined
 	};
 
-	Facebook.init = function(params, callback) {
+	BF.init = function(params, callback) {
 		function render(req, res) {
 			res.render('admin/plugins/sso-bf', {});
 		}
@@ -36,32 +36,32 @@
 		callback();
 	};
 
-	Facebook.getSettings = function(callback) {
-		if (Facebook.settings) {
+	BF.getSettings = function(callback) {
+		if (BF.settings) {
 			return callback();
 		}
 
 		meta.settings.get('sso-bf', function(err, settings) {
-			Facebook.settings = settings;
+			BF.settings = settings;
 			callback();
 		});
 	}
 
-	Facebook.getStrategy = function(strategies, callback) {
-		if (!Facebook.settings) {
-			return Facebook.getSettings(function() {
-				Facebook.getStrategy(strategies, callback);
+	BF.getStrategy = function(strategies, callback) {
+		if (!BF.settings) {
+			return BF.getSettings(function() {
+				BF.getStrategy(strategies, callback);
 			});
 		}
 
 		if (
-			Facebook.settings !== undefined
-			&& Facebook.settings.hasOwnProperty('app_id') && Facebook.settings.app_id
-			&& Facebook.settings.hasOwnProperty('secret') && Facebook.settings.secret
+			BF.settings !== undefined
+			&& BF.settings.hasOwnProperty('app_id') && BF.settings.app_id
+			&& BF.settings.hasOwnProperty('secret') && BF.settings.secret
 		) {
 			passport.use(new passportFacebook({
-				clientID: Facebook.settings.app_id,
-				clientSecret: Facebook.settings.secret,
+				clientID: BF.settings.app_id,
+				clientSecret: BF.settings.secret,
 				callbackURL: nconf.get('url') + '/auth/facebook/callback',
 				passReqToCallback: true, profileFields: ['id', 'emails', 'name', 'displayName']
 			}, function(req, accessToken, refreshToken, profile, done) {
@@ -80,7 +80,7 @@
 					email = (profile.username ? profile.username : profile.id) + '@facebook.com';
 				}
 
-				Facebook.login(profile.id, profile.displayName, email, 'https://graph.facebook.com/' + profile.id + '/picture?type=large', accessToken, refreshToken, profile, function(err, user) {
+				BF.login(profile.id, profile.displayName, email, 'https://graph.facebook.com/' + profile.id + '/picture?type=large', accessToken, refreshToken, profile, function(err, user) {
 					if (err) {
 						return done(err);
 					}
@@ -103,7 +103,7 @@
 		callback(null, strategies);
 	};
 
-	Facebook.getAssociation = function(data, callback) {
+	BF.getAssociation = function(data, callback) {
 		user.getUserField(data.uid, 'fbid', function(err, fbId) {
 			if (err) {
 				return callback(err, data);
@@ -130,20 +130,20 @@
 	};
 
 
-	Facebook.storeAdditionalData = function(userData, data, callback) {
+	BF.storeAdditionalData = function(userData, data, callback) {
 		user.setUserField(userData.uid, 'email', data.email, callback);
 	};
 
-	Facebook.storeTokens = function(uid, accessToken, refreshToken) {
+	BF.storeTokens = function(uid, accessToken, refreshToken) {
 		//JG: Actually save the useful stuff
 		winston.info("Storing received fb access information for uid(" + uid + ") accessToken(" + accessToken + ") refreshToken(" + refreshToken + ")");
 		user.setUserField(uid, 'fbaccesstoken', accessToken);
 		user.setUserField(uid, 'fbrefreshtoken', refreshToken);
 	};
 
-	Facebook.login = function(fbid, name, email, picture, accessToken, refreshToken, profile, callback) {
+	BF.login = function(fbid, name, email, picture, accessToken, refreshToken, profile, callback) {
 
-		winston.verbose("Facebook.login fbid, name, email, picture: " + fbid + ", " + ", " + name + ", " + email + ", " + picture);
+		winston.verbose("BF.login fbid, name, email, picture: " + fbid + ", " + ", " + name + ", " + email + ", " + picture);
 
 		user.getUidByEmail(email, function (err, uid) {
 			if (err) {
@@ -165,18 +165,10 @@
 		});
 	};
 
-	Facebook.getUidByFbid = function(fbid, callback) {
-		db.getObjectField('fbid:uid', fbid, function(err, uid) {
 
-			if (err) {
-				return callback(err);
-			}
-			callback(null, uid);
-		});
-	};
 
-	Facebook.addMenuItem = function(custom_header, callback) {
-		custom_header.authentication.push({
+	BF.addMenuItem = function(custom_header, callback) {
+		custom_header.plugins.push({
 			'route': constants.admin.route,
 			'icon': constants.admin.icon,
 			'name': constants.name
@@ -185,22 +177,5 @@
 		callback(null, custom_header);
 	};
 
-	Facebook.deleteUserData = function(data, callback) {
-		var uid = data.uid;
-
-		async.waterfall([
-			async.apply(user.getUserField, uid, 'fbid'),
-			function(oAuthIdToDelete, next) {
-				db.deleteObjectField('fbid:uid', oAuthIdToDelete, next);
-			}
-		], function(err) {
-			if (err) {
-				winston.error('[sso-bf] Could not remove OAuthId data for uid ' + uid + '. Error: ' + err);
-				return callback(err);
-			}
-			callback(null, uid);
-		});
-	};
-
-	module.exports = Facebook;
+	module.exports = BF;
 }(module));
