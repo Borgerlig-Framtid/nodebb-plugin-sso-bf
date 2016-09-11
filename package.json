@@ -1,11 +1,11 @@
 {
-  "name": "nodebb-plugin-sso-facebook",
+  "name": "nodebb-plugin-sso-bf",
   "version": "3.0.3",
-  "description": "NodeBB Facebook SSO",
+  "description": "NodeBB BF SSO",
   "main": "library.js",
   "repository": {
     "type": "git",
-    "url": "https://github.com/julianlam/nodebb-plugin-sso-facebook"
+    "url": "https://github.com/Borgerlig-Framtid/nodebb-plugin-sso-bf"
   },
   "keywords": [
     "nodebb",
@@ -16,12 +16,12 @@
     "registration"
   ],
   "author": {
-    "name": "Julian Lam",
-    "email": "julian@nodebb.org"
+    "name": "Christoffer Lernö",
+    "email": "christoffer@aegik.com"
   },
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/julianlam/nodebb-plugin-sso-facebook/issues"
+    "url": "https://github.com/Borgerlig-Framtid/nodebb-plugin-sso-bf/issues"
   },
   "readme": "",
   "readmeFilename": "README.md",

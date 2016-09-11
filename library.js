@@ -16,7 +16,7 @@
 	var constants = Object.freeze({
 		'name': 'Facebook',
 		'admin': {
-			'route': '/plugins/sso-facebook',
+			'route': '/plugins/sso-bf',
 			'icon': 'fa-facebook-square'
 		}
 	});
@@ -27,11 +27,11 @@
 
 	Facebook.init = function(params, callback) {
 		function render(req, res) {
-			res.render('admin/plugins/sso-facebook', {});
+			res.render('admin/plugins/sso-bf', {});
 		}
 
-		params.router.get('/admin/plugins/sso-facebook', params.middleware.admin.buildHeader, render);
-		params.router.get('/api/admin/plugins/sso-facebook', render);
+		params.router.get('/admin/plugins/sso-bf', params.middleware.admin.buildHeader, render);
+		params.router.get('/api/admin/plugins/sso-bf', render);
 
 		callback();
 	};
@@ -41,7 +41,7 @@
 			return callback();
 		}
 
-		meta.settings.get('sso-facebook', function(err, settings) {
+		meta.settings.get('sso-bf', function(err, settings) {
 			Facebook.settings = settings;
 			callback();
 		});
@@ -63,13 +63,13 @@
 				clientID: Facebook.settings.app_id,
 				clientSecret: Facebook.settings.secret,
 				callbackURL: nconf.get('url') + '/auth/facebook/callback',
-				passReqToCallback: true,
-                                profileFields: ['id', 'emails', 'name', 'displayName']
+				passReqToCallback: true, profileFields: ['id', 'emails', 'name', 'displayName']
 			}, function(req, accessToken, refreshToken, profile, done) {
 				if (req.hasOwnProperty('user') && req.user.hasOwnProperty('uid') && req.user.uid > 0) {
 					// Save facebook-specific information to the user
 					user.setUserField(req.user.uid, 'fbid', profile.id);
 					db.setObjectField('fbid:uid', profile.id, req.user.uid);
+
 					return done(null, req.user);
 				}
 
@@ -85,12 +85,6 @@
 						return done(err);
 					}
 
-					// Require collection of email
-					if (email.endsWith('@facebook.com')) {
-						req.session.registration = req.session.registration || {};
-						req.session.registration.uid = user.uid;
-						req.session.registration.fbid = profile.id;
-					}
 
 					authenticationController.onSuccessfulLogin(req, user.uid);
 					done(null, user);
@@ -135,26 +129,6 @@
 		})
 	};
 
-	Facebook.prepareInterstitial = function(data, callback) {
-		// Only execute if:
-		//   - uid and fbid are set in session
-		//   - email ends with "@facebook.com"
-		if (data.userData.hasOwnProperty('uid') && data.userData.hasOwnProperty('fbid')) {
-			user.getUserField(data.userData.uid, 'email', function(err, email) {
-				if (email.endsWith('@facebook.com')) {
-					data.interstitials.push({
-						template: 'partials/sso-facebook/email.tpl',
-						data: {},
-						callback: Facebook.storeAdditionalData
-					});
-				}
-
-				callback(null, data);
-			});
-		} else {
-			callback(null, data);
-		}
-	};
 
 	Facebook.storeAdditionalData = function(userData, data, callback) {
 		user.setUserField(userData.uid, 'email', data.email, callback);
@@ -171,64 +145,29 @@
 
 		winston.verbose("Facebook.login fbid, name, email, picture: " + fbid + ", " + ", " + name + ", " + email + ", " + picture);
 
-		Facebook.getUidByFbid(fbid, function(err, uid) {
-			if(err) {
+		user.getUidByEmail(email, function (err, uid) {
+			if (err) {
 				return callback(err);
 			}
 
-			if (uid !== null) {
-				// Existing User
-
-				Facebook.storeTokens(uid, accessToken, refreshToken);
-
-				callback(null, {
-					uid: uid
-				});
-			} else {
-				// New User
-				var success = function(uid) {
-					// Save facebook-specific information to the user
-					user.setUserField(uid, 'fbid', fbid);
-					db.setObjectField('fbid:uid', fbid, uid);
-					var autoConfirm = Facebook.settings && Facebook.settings.autoconfirm === "on" ? 1: 0;
-					user.setUserField(uid, 'email:confirmed', autoConfirm);
-
-					// Save their photo, if present
-					if (picture) {
-						user.setUserField(uid, 'uploadedpicture', picture);
-						user.setUserField(uid, 'picture', picture);
-					}
-
-					Facebook.storeTokens(uid, accessToken, refreshToken);
-
-					callback(null, {
-						uid: uid
-					});
-				};
-
-				user.getUidByEmail(email, function(err, uid) {
-					if(err) {
-						return callback(err);
-					}
-
-					if (!uid) {
-						user.create({username: name, email: email}, function(err, uid) {
-							if(err) {
-								return callback(err);
-							}
-
-							success(uid);
-						});
-					} else {
-						success(uid); // Existing account -- merge
-					}
-				});
+			if (!uid) {
+				return callback(new Error("[[error:Ditt FB-kontos e-mail matchar ingen existerande användare!]]"));
 			}
+
+				// Save their photo, if present
+			user.getUserFields(uid, ['picture', 'uploadedpicture'], function (err, fieldData) {
+				if (!err && picture && fieldData['uploadedpicture'] == '' && fieldData['picture'] == '') {
+					user.setUserField(uid, 'uploadedpicture', picture);
+					user.setUserField(uid, 'picture', picture);
+				}
+				return callback(null, { uid: uid });
+			});
 		});
 	};
 
 	Facebook.getUidByFbid = function(fbid, callback) {
 		db.getObjectField('fbid:uid', fbid, function(err, uid) {
+
 			if (err) {
 				return callback(err);
 			}
@@ -256,7 +195,7 @@
 			}
 		], function(err) {
 			if (err) {
-				winston.error('[sso-facebook] Could not remove OAuthId data for uid ' + uid + '. Error: ' + err);
+				winston.error('[sso-bf] Could not remove OAuthId data for uid ' + uid + '. Error: ' + err);
 				return callback(err);
 			}
 			callback(null, uid);
